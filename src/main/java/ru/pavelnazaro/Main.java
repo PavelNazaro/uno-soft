@@ -62,65 +62,69 @@ public class Main {
     }
 
     private static List<Set<String[]>> groupLines(Set<String[]> uniqueLines) {
-        Map<Integer, Set<String[]>> columnValuesMap = new HashMap<>();
         List<Set<String[]>> groups = new ArrayList<>();
+        Set<String[]> usedLines = new HashSet<>();
+        Map<Integer, Map<String, Set<String[]>>> columnIndex = new HashMap<>();
 
         for (String[] line : uniqueLines) {
-            columnValuesMap.computeIfAbsent(line.length, k -> new HashSet<>()).add(line);
-        }
-
-        for (Set<String[]> linesWithSameLength : columnValuesMap.values()) {
-            Map<Integer, Map<String, Set<String[]>>> columnIndex = new HashMap<>();
-
-            for (String[] line : linesWithSameLength) {
-                for (int i = 0; i < line.length; i++) {
-                    if (!line[i].isEmpty()) {
-                        columnIndex.computeIfAbsent(i, k -> new HashMap<>())
-                                .computeIfAbsent(line[i], k -> new HashSet<>())
-                                .add(line);
-                    }
+            for (int i = 0; i < line.length; i++) {
+                if (!line[i].isEmpty()) {
+                    columnIndex
+                            .computeIfAbsent(i, k -> new HashMap<>())
+                            .computeIfAbsent(line[i], k -> new HashSet<>())
+                            .add(line);
                 }
             }
-
-            Set<String[]> visited = new HashSet<>();
-            List<Set<String[]>> tempGroups = new ArrayList<>();
-
-            for (String[] line : linesWithSameLength) {
-                if (!visited.contains(line)) {
-                    Set<String[]> currentGroup = new HashSet<>();
-                    findGroup(columnIndex, line, visited, currentGroup);
-
-                    if (currentGroup.size() > 1) {
-                        tempGroups.add(currentGroup);
-                    }
-                }
-            }
-
-            groups.addAll(tempGroups);
         }
 
-        groups.sort(Comparator.comparingInt((Set<String[]> group) -> group.stream().mapToInt(arr -> arr.length).sum()).reversed());
+        for (String[] line : uniqueLines) {
+            if (usedLines.contains(line)) {
+                continue;
+            }
 
-        return groups;
-    }
+            Set<String[]> currentGroup = new HashSet<>();
+            Queue<String[]> queue = new LinkedList<>();
+            queue.add(line);
+            usedLines.add(line);
 
-    private static void findGroup(Map<Integer, Map<String, Set<String[]>>> columnIndex, String[] currentLine,
-                                  Set<String[]> visited, Set<String[]> currentGroup) {
-        visited.add(currentLine);
-        currentGroup.add(currentLine);
+            while (!queue.isEmpty()) {
+                String[] currentLine = queue.poll();
+                currentGroup.add(currentLine);
 
-        for (int i = 0; i < currentLine.length; i++) {
-            if (!currentLine[i].isEmpty()) {
-                Set<String[]> possibleMatches = columnIndex.get(i).get(currentLine[i]);
-                if (possibleMatches != null) {
-                    for (String[] line : possibleMatches) {
-                        if (!visited.contains(line)) {
-                            findGroup(columnIndex, line, visited, currentGroup);
+                for (int i = 0; i < currentLine.length; i++) {
+                    if (!currentLine[i].isEmpty()) {
+                        Set<String[]> matches = columnIndex.get(i).get(currentLine[i]);
+                        if (matches != null) {
+                            for (String[] match : matches) {
+                                if (!usedLines.contains(match) && hasColumnMatch(currentLine, match)) {
+                                    queue.add(match);
+                                    usedLines.add(match);
+                                }
+                            }
                         }
                     }
                 }
             }
+
+            if (currentGroup.size() > 1) {
+                groups.add(currentGroup);
+            }
         }
+
+        groups.sort(Comparator.comparingInt((Set<String[]> group) ->
+                group.stream().mapToInt(arr -> arr.length).sum()).reversed());
+
+        return groups;
+    }
+
+    private static boolean hasColumnMatch(String[] line1, String[] line2) {
+        int minCount = Math.min(line1.length, line2.length);
+        for (int i = 0; i < minCount; i++) {
+            if (!line1[i].isEmpty() && line1[i].equals(line2[i])) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void writeGroupsToFile(List<Set<String[]>> groups) {
@@ -139,4 +143,5 @@ public class Main {
             e.printStackTrace();
         }
     }
+
 }
